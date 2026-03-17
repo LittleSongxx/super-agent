@@ -5,22 +5,18 @@
 
     <parent>
         <groupId>org.javaup</groupId>
-        <artifactId>super-ai-hub</artifactId>
+        <artifactId>ai-example</artifactId>
         <version>${revision}</version>
     </parent>
 
 
-    <artifactId>ai-example</artifactId>
+    <artifactId>ai-example-rag</artifactId>
     <packaging>pom</packaging>
 
-    <name>ai-example</name>
-    <description>ai示例</description>
+    <name>ai-example-rag</name>
+    <description>ai的rag示例</description>
 
     <modules>
-        <module>ai-example-one</module>
-        <module>ai-example-spring-ai</module>
-        <module>ai-example-mcp</module>
-        <module>ai-example-rag</module>
-        <module>ai-example-spring-ai-alibaba</module>
+        <module>ai-example-spring-ai-rag</module>
     </modules>
 </project>

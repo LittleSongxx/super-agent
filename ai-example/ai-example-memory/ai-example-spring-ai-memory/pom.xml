@@ -5,14 +5,14 @@
     
     <parent>
         <groupId>org.javaup</groupId>
-        <artifactId>ai-example-rag</artifactId>
+        <artifactId>ai-example-memory</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>ai-example-spring-ai-rag</artifactId>
+    <artifactId>ai-example-spring-ai-memory</artifactId>
     
-    <name>ai-example-spring-ai-rag</name>
-    <description>SpringAI的rag示例</description>
+    <name>ai-example-spring-ai-memory</name>
+    <description>SpringAI会话记忆示例</description>
     
     <dependencies>
         <!-- Spring AI OpenAI（硅基流动兼容OpenAI协议） -->
@@ -35,42 +35,12 @@
             <classifier>osx-aarch_64</classifier>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-pdf-document-reader</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-jsoup-document-reader</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-markdown-document-reader</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-tika-document-reader</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-rag</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.alibaba.cloud.ai</groupId>
-            <artifactId>spring-ai-alibaba-dashscope</artifactId>
-            <version>${spring-ai.alibaba.version}</version>
-        </dependency>
-        <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
         </dependency>
         <dependency>
-            <groupId>cn.hutool</groupId>
-            <artifactId>hutool-all</artifactId>
-            <version>${hutool.version}</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
     </dependencies>
     
@@ -81,7 +51,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring.boot.version}</version>
                 <configuration>
-                    <mainClass>org.javaup.ExampleSpringAiRagNeo4jApplication</mainClass>
+                    <mainClass>org.javaup.ExampleSpringAiMemoryApplication</mainClass>
                 </configuration>
                 <executions>
                     <execution>

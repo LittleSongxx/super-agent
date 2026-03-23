@@ -10,18 +10,13 @@
     </parent>
 
 
-    <artifactId>ai-example-rag</artifactId>
+    <artifactId>ai-example-memory</artifactId>
     <packaging>pom</packaging>
 
-    <name>ai-example-rag</name>
-    <description>ai的rag示例</description>
+    <name>ai-example-memory</name>
+    <description>ai的会话记忆示例</description>
 
     <modules>
-        <module>ai-example-spring-ai-rag</module>
-        <module>ai-example-spring-ai-rag-pg</module>
-        <module>ai-example-spring-ai-rag-pg-es</module>
-        <module>ai-example-demo-rag</module>
-        <module>ai-example-spring-ai-rag-milvus</module>
-        <module>ai-example-spring-ai-rag-neo4j</module>
+        <module>ai-example-spring-ai-memory</module>
     </modules>
 </project>

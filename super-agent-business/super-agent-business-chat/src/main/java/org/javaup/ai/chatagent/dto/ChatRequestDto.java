@@ -23,5 +23,9 @@ public class ChatRequestDto {
     @NotBlank(message = "chatMode 不能为空")
     private String chatMode;
 
+    private String tenantId;
+
+    private String userId;
+
     private String selectedDocumentId;
 }

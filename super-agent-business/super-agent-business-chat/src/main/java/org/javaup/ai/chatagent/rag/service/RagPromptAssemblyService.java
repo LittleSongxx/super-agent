@@ -67,6 +67,7 @@ public class RagPromptAssemblyService {
         }
 
         appendHistoryContext(builder, plan);
+        appendUserMemoryContext(builder, plan);
 
         if (plan.getRetrievalSubQuestions() != null && plan.getRetrievalSubQuestions().size() > 1) {
 
@@ -189,6 +190,17 @@ public class RagPromptAssemblyService {
         }
 
         builder.append(answerHistoryContext.getRenderedText().trim()).append("\n\n");
+    }
+
+    private void appendUserMemoryContext(StringBuilder builder, ConversationExecutionPlan plan) {
+        if (plan.getUserMemoryContext() == null || StrUtil.isBlank(plan.getUserMemoryContext().getMemoryPromptText())) {
+            return;
+        }
+
+        builder.append("用户长期画像与跨会话记忆：\n")
+            .append(plan.getUserMemoryContext().getMemoryPromptText().trim())
+            .append("\n")
+            .append("说明：这些记忆只用于理解用户偏好、长期目标和任务连续性，不能替代证据材料中的事实。\n\n");
     }
 
     private String referenceSummary(SearchReference reference, String suffix) {

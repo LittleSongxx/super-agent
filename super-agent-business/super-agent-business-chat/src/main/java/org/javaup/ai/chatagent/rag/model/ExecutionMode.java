@@ -14,6 +14,8 @@ public enum ExecutionMode {
 
     RETRIEVAL,
 
+    AGENTIC_RAG,
+
     REACT_AGENT,
 
     CLARIFICATION,

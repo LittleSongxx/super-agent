@@ -67,6 +67,37 @@ CREATE INDEX IF NOT EXISTS idx_super_agent_document_embedding_parent_block_id
 CREATE INDEX IF NOT EXISTS idx_super_agent_document_embedding_status
     ON public.super_agent_document_embedding (status);
 
+CREATE TABLE IF NOT EXISTS public.super_agent_user_memory_embedding (
+    memory_id BIGINT NOT NULL,
+    tenant_id VARCHAR(64) NOT NULL,
+    user_id VARCHAR(128) NOT NULL,
+    memory_type VARCHAR(32) NOT NULL,
+    memory_key VARCHAR(128),
+    memory_text TEXT NOT NULL,
+    source_conversation_id VARCHAR(64),
+    source_exchange_id BIGINT,
+    importance INTEGER DEFAULT 50,
+    confidence NUMERIC(5,4) DEFAULT 0.7000,
+    embedding_model VARCHAR(128),
+    metadata_json JSONB DEFAULT '{}'::jsonb,
+    embedding VECTOR NOT NULL,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    edit_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status SMALLINT DEFAULT 1,
+    PRIMARY KEY (memory_id)
+);
+
+COMMENT ON TABLE public.super_agent_user_memory_embedding IS '用户长期记忆向量表';
+
+CREATE INDEX IF NOT EXISTS idx_super_agent_user_memory_embedding_user
+    ON public.super_agent_user_memory_embedding (tenant_id, user_id);
+
+CREATE INDEX IF NOT EXISTS idx_super_agent_user_memory_embedding_type
+    ON public.super_agent_user_memory_embedding (memory_type);
+
+CREATE INDEX IF NOT EXISTS idx_super_agent_user_memory_embedding_status
+    ON public.super_agent_user_memory_embedding (status);
+
 -- 当前第一期为了兼容不同 embedding 模型的维度变化，embedding 字段使用未固定维度的 VECTOR 类型。
 -- 如果后续固定模型与维度，例如 1024 或 1536，
 -- 可以把字段改成 VECTOR(1024/1536) 并补充 HNSW 或 IVF_FLAT 向量索引。

@@ -516,3 +516,52 @@ CREATE TABLE IF NOT EXISTS super_agent_chat_stage_benchmark (
     PRIMARY KEY (id),
     UNIQUE KEY uk_stage_benchmark_code_mode (stage_code, execution_mode)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='阶段性能基准表';
+
+CREATE TABLE IF NOT EXISTS super_agent_user_profile (
+    id BIGINT NOT NULL COMMENT '主键id',
+    tenant_id VARCHAR(64) NOT NULL DEFAULT 'default' COMMENT '租户id',
+    user_id VARCHAR(128) NOT NULL COMMENT '用户id',
+    profile_version INT NOT NULL DEFAULT '1' COMMENT '画像版本',
+    role_summary VARCHAR(1000) DEFAULT NULL COMMENT '用户角色摘要',
+    technical_stack_json JSON DEFAULT NULL COMMENT '技术栈画像JSON',
+    preference_json JSON DEFAULT NULL COMMENT '偏好画像JSON',
+    constraints_json JSON DEFAULT NULL COMMENT '长期约束JSON',
+    active_goal_json JSON DEFAULT NULL COMMENT '长期目标JSON',
+    profile_summary TEXT DEFAULT NULL COMMENT '可注入Prompt的画像摘要',
+    profile_status TINYINT(1) NOT NULL DEFAULT '1' COMMENT '1:自动生成 2:人工确认 3:禁用',
+    last_memory_update_time DATETIME DEFAULT NULL COMMENT '最近记忆更新时间',
+    create_time DATETIME DEFAULT NULL COMMENT '创建时间',
+    edit_time DATETIME DEFAULT NULL COMMENT '编辑时间',
+    status TINYINT(1) DEFAULT '1' COMMENT '1:正常 0:删除',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_profile_tenant_user (tenant_id, user_id),
+    KEY idx_user_profile_status (profile_status, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户画像表';
+
+CREATE TABLE IF NOT EXISTS super_agent_user_memory (
+    id BIGINT NOT NULL COMMENT '主键id',
+    tenant_id VARCHAR(64) NOT NULL DEFAULT 'default' COMMENT '租户id',
+    user_id VARCHAR(128) NOT NULL COMMENT '用户id',
+    memory_type VARCHAR(32) NOT NULL COMMENT '记忆类型 PROFILE/PREFERENCE/TASK/FACT/EPISODIC',
+    memory_key VARCHAR(128) DEFAULT NULL COMMENT '稳定记忆键',
+    memory_text TEXT NOT NULL COMMENT '可注入Prompt的记忆文本',
+    memory_json JSON DEFAULT NULL COMMENT '结构化记忆JSON',
+    source_conversation_id VARCHAR(64) DEFAULT NULL COMMENT '来源会话id',
+    source_exchange_id BIGINT DEFAULT NULL COMMENT '来源轮次id',
+    importance INT NOT NULL DEFAULT '50' COMMENT '重要性0-100',
+    confidence DECIMAL(5,4) NOT NULL DEFAULT '0.7000' COMMENT '置信度0-1',
+    visibility VARCHAR(32) NOT NULL DEFAULT 'PRIVATE' COMMENT '可见范围',
+    effective_from DATETIME DEFAULT NULL COMMENT '生效时间',
+    expires_at DATETIME DEFAULT NULL COMMENT '过期时间',
+    last_access_time DATETIME DEFAULT NULL COMMENT '最近召回时间',
+    access_count INT NOT NULL DEFAULT '0' COMMENT '召回次数',
+    memory_status TINYINT(1) NOT NULL DEFAULT '1' COMMENT '1:正常 2:待确认 3:禁用',
+    create_time DATETIME DEFAULT NULL COMMENT '创建时间',
+    edit_time DATETIME DEFAULT NULL COMMENT '编辑时间',
+    status TINYINT(1) DEFAULT '1' COMMENT '1:正常 0:删除',
+    PRIMARY KEY (id),
+    KEY idx_user_memory_user_type (tenant_id, user_id, memory_type, memory_status, status),
+    KEY idx_user_memory_key (tenant_id, user_id, memory_key),
+    KEY idx_user_memory_source (source_conversation_id, source_exchange_id),
+    KEY idx_user_memory_access (last_access_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户长期记忆表';

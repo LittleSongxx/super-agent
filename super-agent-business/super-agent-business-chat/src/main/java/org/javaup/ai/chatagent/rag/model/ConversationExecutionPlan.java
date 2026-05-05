@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.javaup.ai.chatagent.model.memory.UserMemoryContext;
 import org.javaup.enums.ChatQueryMode;
 
 import java.time.LocalDate;
@@ -25,6 +26,10 @@ public class ConversationExecutionPlan {
     private ExecutionMode mode;
 
     private ChatQueryMode chatMode;
+
+    private String tenantId;
+
+    private String userId;
 
     private String originalQuestion;
 
@@ -52,6 +57,8 @@ public class ConversationExecutionPlan {
     private String answerRecentTranscript;
 
     private AnswerHistoryContext answerHistoryContext;
+
+    private UserMemoryContext userMemoryContext;
 
     private DocumentNavigationDecision navigationDecision;
 

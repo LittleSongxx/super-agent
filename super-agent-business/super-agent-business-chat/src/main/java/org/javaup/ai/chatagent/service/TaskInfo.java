@@ -29,6 +29,8 @@ public class TaskInfo {
 
     private final String question;
     private final ChatQueryMode chatMode;
+    private final String tenantId;
+    private final String userId;
     private final String traceId;
     private final Long selectedDocumentId;
     private final String selectedDocumentName;
@@ -66,6 +68,8 @@ public class TaskInfo {
                     long exchangeId,
                     String question,
                     ChatQueryMode chatMode,
+                    String tenantId,
+                    String userId,
                     String traceId,
                     Long selectedDocumentId,
                     String selectedDocumentName,
@@ -88,6 +92,8 @@ public class TaskInfo {
         this.exchangeId = exchangeId;
         this.question = question;
         this.chatMode = chatMode;
+        this.tenantId = tenantId;
+        this.userId = userId;
         this.traceId = traceId;
         this.selectedDocumentId = selectedDocumentId;
         this.selectedDocumentName = selectedDocumentName;
@@ -122,6 +128,14 @@ public class TaskInfo {
 
     public ChatQueryMode chatMode() {
         return chatMode;
+    }
+
+    public String tenantId() {
+        return tenantId;
+    }
+
+    public String userId() {
+        return userId;
     }
 
     public String traceId() {

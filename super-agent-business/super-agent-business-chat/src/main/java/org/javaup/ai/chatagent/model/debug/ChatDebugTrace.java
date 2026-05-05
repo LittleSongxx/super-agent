@@ -27,6 +27,10 @@ public class ChatDebugTrace {
 
     private ChatQueryMode chatMode;
 
+    private String tenantId;
+
+    private String userId;
+
     private String originalQuestion;
 
     private String rewriteQuestion;
@@ -52,6 +56,8 @@ public class ChatDebugTrace {
     private String answerHistoryContext;
 
     private boolean answerHistoryFollowUpQuestion;
+
+    private String userMemoryContext;
 
     private boolean historyCompressionApplied;
 

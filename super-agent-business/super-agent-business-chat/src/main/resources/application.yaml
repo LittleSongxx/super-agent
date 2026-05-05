@@ -216,6 +216,24 @@ app:
         model: BAAI/bge-reranker-v2-m3
         # 单次精排后保留的前 N 个候选。
         top-n: 5
+    user-memory:
+      enabled: true
+      vector-recall-enabled: true
+      extraction-enabled: true
+      default-tenant-id: default
+      default-user-id: admin
+      recall-top-k: 5
+      profile-max-chars: 1000
+      memory-max-chars: 1500
+      extraction-max-memories: 6
+      extraction-max-answer-chars: 1600
+    crag:
+      enabled: false
+      max-corrective-rounds: 1
+      evaluator-mode: rule
+    agentic-rag:
+      enabled: false
+      max-steps: 3
 
   tavily:
     # 是否启用 Tavily 联网搜索工具。

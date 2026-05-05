@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.javaup.ai.manage.config.DocumentManageProperties;
 import org.javaup.ai.manage.data.SuperAgentDocument;
 import org.javaup.ai.manage.data.SuperAgentDocumentChunk;
 import org.javaup.ai.manage.data.SuperAgentDocumentParentBlock;
@@ -30,11 +31,14 @@ import org.javaup.ai.manage.service.DocumentStructureGraphProjectionService;
 import org.javaup.ai.manage.service.DocumentStructureNodeService;
 import org.javaup.ai.manage.service.DocumentTaskLogService;
 import org.javaup.ai.manage.service.DocumentVectorGateway;
+import org.javaup.ai.manage.service.DocumentVisualAnalysisService;
+import org.javaup.ai.manage.service.DocumentVisualElementService;
 import org.javaup.ai.manage.service.keyword.DocumentKeywordSearchGateway;
 import org.javaup.ai.manage.support.ChunkCandidate;
 import org.javaup.ai.manage.support.DocumentAnalysisResult;
 import org.javaup.ai.manage.support.DocumentStrategyPlanDraft;
 import org.javaup.ai.manage.support.DocumentStrategyStepDraft;
+import org.javaup.ai.manage.support.DocumentVisualAnalysisResult;
 import org.javaup.ai.manage.support.ParentBlockCandidate;
 import org.javaup.enums.BusinessStatus;
 import org.javaup.enums.DocumentChunkSourceTypeEnum;
@@ -105,6 +109,12 @@ public class DocumentAsyncProcessServiceImpl implements DocumentAsyncProcessServ
 
     private final DocumentProfileService documentProfileService;
 
+    private final DocumentManageProperties documentManageProperties;
+
+    private final DocumentVisualAnalysisService visualAnalysisService;
+
+    private final DocumentVisualElementService visualElementService;
+
     @Resource
     private UidGenerator uidGenerator;
 
@@ -142,6 +152,13 @@ public class DocumentAsyncProcessServiceImpl implements DocumentAsyncProcessServ
             byte[] fileBytes = storageService.downloadObject(document.getObjectName());
             DocumentAnalysisResult analysisResult = parserService.parse(fileBytes, document.getOriginalFileName(),
                 document.getMimeType(), DocumentFileTypeEnum.getRc(document.getFileType()));
+            DocumentVisualAnalysisResult visualAnalysisResult = safeAnalyzeVisualElements(fileBytes, document, analysisResult);
+            mergeVisualText(analysisResult, visualAnalysisResult);
+            int visualElementCount = visualElementService.replaceVisualElements(
+                documentId,
+                taskId,
+                visualAnalysisResult == null ? List.of() : visualAnalysisResult.getElements()
+            ).size();
 
             String parseTextPath = storageService.uploadParsedText(documentId, analysisResult.getParsedText());
 
@@ -166,7 +183,8 @@ public class DocumentAsyncProcessServiceImpl implements DocumentAsyncProcessServ
                     "tokenCount", analysisResult.getTokenCount(),
                     "structureLevel", analysisResult.getStructureLevel(),
                     "contentQualityLevel", analysisResult.getContentQualityLevel(),
-                    "structureNodeCount", structureNodeCount
+                    "structureNodeCount", structureNodeCount,
+                    "visualElementCount", visualElementCount
                 ));
 
             task.setCurrentStage(DocumentTaskStageEnum.STRATEGY_ROUTE.getCode());
@@ -636,6 +654,45 @@ public class DocumentAsyncProcessServiceImpl implements DocumentAsyncProcessServ
         }
 
         return chineseCount + englishCount + Math.max(1, (text.length() - chineseCount) / 4);
+    }
+
+    private DocumentVisualAnalysisResult safeAnalyzeVisualElements(byte[] fileBytes,
+                                                                   SuperAgentDocument document,
+                                                                   DocumentAnalysisResult analysisResult) {
+        if (documentManageProperties == null
+            || documentManageProperties.getVisualParsing() == null
+            || !Boolean.TRUE.equals(documentManageProperties.getVisualParsing().getEnabled())) {
+            return DocumentVisualAnalysisResult.builder().build();
+        }
+        try {
+            DocumentVisualAnalysisResult result = visualAnalysisService.analyze(fileBytes, document, analysisResult);
+            if (result == null) {
+                return DocumentVisualAnalysisResult.builder().build();
+            }
+            if (result.getElements() != null && result.getElements().size() > documentManageProperties.getVisualParsing().getMaxElements()) {
+                result.setElements(result.getElements().subList(0, Math.max(1, documentManageProperties.getVisualParsing().getMaxElements())));
+            }
+            if (!Boolean.TRUE.equals(documentManageProperties.getVisualParsing().getMergeVisualTextIntoParsedText())) {
+                result.setMergedVisualText("");
+            }
+            return result;
+        }
+        catch (RuntimeException exception) {
+            log.warn("文档视觉/OCR解析失败，已回退到纯文本解析, documentId={}", document == null ? null : document.getId(), exception);
+            return DocumentVisualAnalysisResult.builder().build();
+        }
+    }
+
+    private void mergeVisualText(DocumentAnalysisResult analysisResult,
+                                 DocumentVisualAnalysisResult visualAnalysisResult) {
+        if (analysisResult == null || visualAnalysisResult == null || StrUtil.isBlank(visualAnalysisResult.getMergedVisualText())) {
+            return;
+        }
+        String originalText = StrUtil.blankToDefault(analysisResult.getParsedText(), "");
+        String mergedText = originalText + "\n\n[图片/OCR补充文本]\n" + visualAnalysisResult.getMergedVisualText().trim();
+        analysisResult.setParsedText(mergedText);
+        analysisResult.setCharCount(mergedText.length());
+        analysisResult.setTokenCount(estimateTokenCount(mergedText));
     }
 
     private Map<String, Object> detail(Object... keyValues) {

@@ -22,6 +22,10 @@ public class StreamLaunchPlan {
 
     private final ChatQueryMode chatMode;
 
+    private final String tenantId;
+
+    private final String userId;
+
     private final Long selectedDocumentId;
 
     private final String selectedDocumentName;

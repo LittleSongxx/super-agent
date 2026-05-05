@@ -5,6 +5,7 @@ import org.javaup.ai.chatagent.rag.model.ConversationExecutionPlan;
 import org.javaup.ai.chatagent.rag.model.ExecutionMode;
 import org.javaup.ai.chatagent.rag.model.RagPromptAssemblyResult;
 import org.javaup.ai.chatagent.rag.model.RagRetrievalContext;
+import org.javaup.ai.chatagent.rag.service.CragRetrievalCorrectionService;
 import org.javaup.ai.chatagent.rag.service.RagPromptAssemblyService;
 import org.javaup.ai.chatagent.rag.service.RagRetrievalEngine;
 import org.javaup.ai.chatagent.rag.support.ExecutorEventSupport;
@@ -30,15 +31,18 @@ import java.util.List;
 public class RagChatExecutor implements ConversationExecutor {
 
     private final RagRetrievalEngine ragRetrievalEngine;
+    private final CragRetrievalCorrectionService cragRetrievalCorrectionService;
     private final RagPromptAssemblyService ragPromptAssemblyService;
     private final StreamEventWriter streamEventWriter;
     private final ObservedChatModelService observedChatModelService;
 
     public RagChatExecutor(RagRetrievalEngine ragRetrievalEngine,
+                           CragRetrievalCorrectionService cragRetrievalCorrectionService,
                            RagPromptAssemblyService ragPromptAssemblyService,
                            StreamEventWriter streamEventWriter,
                            ObservedChatModelService observedChatModelService) {
         this.ragRetrievalEngine = ragRetrievalEngine;
+        this.cragRetrievalCorrectionService = cragRetrievalCorrectionService;
         this.ragPromptAssemblyService = ragPromptAssemblyService;
         this.streamEventWriter = streamEventWriter;
         this.observedChatModelService = observedChatModelService;
@@ -59,7 +63,10 @@ public class RagChatExecutor implements ConversationExecutor {
             ? null
             : taskInfo.traceRecorder().startStage(ConversationTraceStageCode.RAG_RETRIEVE, mode().name(), "正在执行双通道混合检索。", null);
 
-        return Mono.fromCallable(() -> ragRetrievalEngine.retrieve(plan, taskInfo.traceRecorder()))
+        return Mono.fromCallable(() -> {
+                RagRetrievalContext context = ragRetrievalEngine.retrieve(plan, taskInfo.traceRecorder());
+                return cragRetrievalCorrectionService.evaluateAndCorrect(plan, context, taskInfo.traceRecorder());
+            })
             .subscribeOn(Schedulers.boundedElastic())
             .doOnError(error -> {
                 if (taskInfo.traceRecorder() != null) {

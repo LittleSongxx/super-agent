@@ -2,8 +2,10 @@ package org.javaup.ai.chatagent.rag.service;
 
 import cn.hutool.core.util.StrUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.javaup.ai.chatagent.config.ChatAgenticRagProperties;
 import org.javaup.ai.chatagent.model.memory.ConversationMemoryContext;
 import org.javaup.ai.chatagent.model.memory.ConversationSummaryPayload;
+import org.javaup.ai.chatagent.model.memory.UserMemoryContext;
 import org.javaup.ai.chatagent.model.trace.ConversationTraceStageCode;
 import org.javaup.ai.chatagent.rag.config.ChatRagProperties;
 import org.javaup.ai.chatagent.rag.model.AnswerHistoryContext;
@@ -15,6 +17,7 @@ import org.javaup.ai.chatagent.rag.model.RagRewriteResult;
 import org.javaup.ai.chatagent.service.ConversationMemoryService;
 import org.javaup.ai.chatagent.service.ConversationTraceRecorder;
 import org.javaup.ai.chatagent.service.TaskInfo;
+import org.javaup.ai.chatagent.service.UserMemoryRecallService;
 import org.javaup.ai.manage.model.route.DocumentRouteCandidate;
 import org.javaup.ai.manage.model.route.KnowledgeRouteDecision;
 import org.javaup.ai.manage.model.KnowledgeDocumentDescriptor;
@@ -54,27 +57,33 @@ public class ChatPreparationOrchestrator {
     );
 
     private final ChatRagProperties properties;
+    private final ChatAgenticRagProperties agenticRagProperties;
     private final ConversationMemoryService conversationMemoryService;
     private final AnswerHistoryContextAssembler answerHistoryContextAssembler;
     private final ChatQueryRewriteService chatQueryRewriteService;
     private final DocumentQuestionRouter documentQuestionRouter;
     private final KnowledgeRouteService knowledgeRouteService;
     private final DocumentKnowledgeService documentKnowledgeService;
+    private final UserMemoryRecallService userMemoryRecallService;
 
     public ChatPreparationOrchestrator(ChatRagProperties properties,
+                                       ChatAgenticRagProperties agenticRagProperties,
                                        ConversationMemoryService conversationMemoryService,
                                        AnswerHistoryContextAssembler answerHistoryContextAssembler,
                                        ChatQueryRewriteService chatQueryRewriteService,
                                        DocumentQuestionRouter documentQuestionRouter,
                                        KnowledgeRouteService knowledgeRouteService,
-                                       DocumentKnowledgeService documentKnowledgeService) {
+                                       DocumentKnowledgeService documentKnowledgeService,
+                                       UserMemoryRecallService userMemoryRecallService) {
         this.properties = properties;
+        this.agenticRagProperties = agenticRagProperties;
         this.conversationMemoryService = conversationMemoryService;
         this.answerHistoryContextAssembler = answerHistoryContextAssembler;
         this.chatQueryRewriteService = chatQueryRewriteService;
         this.documentQuestionRouter = documentQuestionRouter;
         this.knowledgeRouteService = knowledgeRouteService;
         this.documentKnowledgeService = documentKnowledgeService;
+        this.userMemoryRecallService = userMemoryRecallService;
     }
 
     public ConversationExecutionPlan prepare(TaskInfo taskInfo) {
@@ -115,6 +124,7 @@ public class ChatPreparationOrchestrator {
 
         HistoryPlanningContext historyPlanningContext = buildHistoryPlanningContext(memoryContext);
         String historySummary = buildPlanningHistory(memoryContext, historyPlanningContext);
+        UserMemoryContext userMemoryContext = userMemoryRecallService.recall(taskInfo.tenantId(), taskInfo.userId(), question);
         AnswerHistoryContext answerHistoryContext = buildAnswerHistoryContext(
             question,
             memoryContext == null ? "" : memoryContext.getAnswerRecentTranscript()
@@ -127,7 +137,7 @@ public class ChatPreparationOrchestrator {
         }
 
         if (chatMode == ChatQueryMode.OPEN_CHAT) {
-            ConversationExecutionPlan plan = basePlan(question, chatMode, memoryContext, historyPlanningContext, historySummary, answerHistoryContext, currentDate, currentDateText,
+            ConversationExecutionPlan plan = basePlan(taskInfo, question, chatMode, memoryContext, userMemoryContext, historyPlanningContext, historySummary, answerHistoryContext, currentDate, currentDateText,
                 requiresCurrentDateAnchoring, requiresFreshSearch)
                 .mode(ExecutionMode.REACT_AGENT)
                 .build();
@@ -192,7 +202,7 @@ public class ChatPreparationOrchestrator {
             knowledgeRouteService.recordAutoRoute(conversationId, taskInfo.exchangeId(), question, rewriteQuestion, routeDecision);
             List<DocumentRouteCandidate> candidateDocuments = selectAutoCandidates(routeDecision, question, rewriteQuestion);
             if (shouldAskClarification(routeDecision, candidateDocuments)) {
-                return basePlan(question, chatMode, memoryContext, historyPlanningContext, historySummary, answerHistoryContext, currentDate, currentDateText,
+                return basePlan(taskInfo, question, chatMode, memoryContext, userMemoryContext, historyPlanningContext, historySummary, answerHistoryContext, currentDate, currentDateText,
                     requiresCurrentDateAnchoring, requiresFreshSearch)
                     .mode(ExecutionMode.CLARIFICATION)
                     .rewriteQuestion(rewriteQuestion)
@@ -284,6 +294,9 @@ public class ChatPreparationOrchestrator {
         ExecutionMode executionMode = navigationDecision == null || navigationDecision.getExecutionMode() == null
             ? ExecutionMode.RETRIEVAL
             : navigationDecision.getExecutionMode();
+        if (executionMode == ExecutionMode.RETRIEVAL && agenticRagProperties != null && agenticRagProperties.isEnabled()) {
+            executionMode = ExecutionMode.AGENTIC_RAG;
+        }
         String retrievalQuestion = navigationDecision == null || navigationDecision.getRetrievalPlan() == null
             ? rewriteQuestion
             : firstNonBlank(navigationDecision.getRetrievalPlan().getRetrievalQuestion(), rewriteQuestion);
@@ -301,7 +314,7 @@ public class ChatPreparationOrchestrator {
             executionMode,
             navigationDecision == null || navigationDecision.getStructureAnchor() == null ? "" : safeText(navigationDecision.getStructureAnchor().getTargetSectionHint()));
 
-        return basePlan(question, chatMode, memoryContext, historyPlanningContext, historySummary, answerHistoryContext, currentDate, currentDateText,
+        return basePlan(taskInfo, question, chatMode, memoryContext, userMemoryContext, historyPlanningContext, historySummary, answerHistoryContext, currentDate, currentDateText,
             requiresCurrentDateAnchoring, requiresFreshSearch)
             .mode(executionMode)
             .navigationDecision(navigationDecision)
@@ -318,9 +331,11 @@ public class ChatPreparationOrchestrator {
             .build();
     }
 
-    private ConversationExecutionPlan.ConversationExecutionPlanBuilder basePlan(String question,
+    private ConversationExecutionPlan.ConversationExecutionPlanBuilder basePlan(TaskInfo taskInfo,
+                                                                                String question,
                                                                                 ChatQueryMode chatMode,
                                                                                 ConversationMemoryContext memoryContext,
+                                                                                UserMemoryContext userMemoryContext,
                                                                                 HistoryPlanningContext historyPlanningContext,
                                                                                 String historySummary,
                                                                                 AnswerHistoryContext answerHistoryContext,
@@ -330,6 +345,8 @@ public class ChatPreparationOrchestrator {
                                                                                 boolean requiresFreshSearch) {
         return ConversationExecutionPlan.builder()
             .chatMode(chatMode)
+            .tenantId(taskInfo.tenantId())
+            .userId(taskInfo.userId())
             .originalQuestion(question)
             .agentQuestion(question)
             .rewriteQuestion(question)
@@ -342,6 +359,7 @@ public class ChatPreparationOrchestrator {
             .recentHistoryTranscript(memoryContext.getRecentTranscript())
             .answerRecentTranscript(memoryContext.getAnswerRecentTranscript())
             .answerHistoryContext(answerHistoryContext)
+            .userMemoryContext(userMemoryContext)
             .historyCompressionApplied(memoryContext.isCompressionApplied())
             .historyCoveredExchangeId(memoryContext.getCoveredExchangeId())
             .historyCoveredExchangeCount(memoryContext.getCoveredExchangeCount())

@@ -21,6 +21,7 @@ import org.javaup.ai.chatagent.model.RetrievalResultView;
 import org.javaup.ai.chatagent.model.StageBenchmarkView;
 import org.javaup.ai.chatagent.model.SearchReference;
 import org.javaup.ai.chatagent.model.debug.ChatDebugTrace;
+import org.javaup.ai.chatagent.model.memory.UserIdentity;
 import org.javaup.ai.chatagent.rag.executor.ConversationExecutor;
 import org.javaup.ai.chatagent.rag.executor.ConversationExecutorRegistry;
 import org.javaup.ai.chatagent.rag.model.ConversationExecutionPlan;
@@ -90,6 +91,8 @@ public class BusinessChatService {
     private final ChatPreparationOrchestrator chatPreparationOrchestrator;
     private final ConversationExecutorRegistry conversationExecutorRegistry;
     private final ConversationMemoryService conversationMemoryService;
+    private final UserIdentityResolver userIdentityResolver;
+    private final UserMemoryExtractionService userMemoryExtractionService;
     private final DocumentKnowledgeService documentKnowledgeService;
     private final ConversationTraceStageStore conversationTraceStageStore;
     private final RetrievalObserveStore retrievalObserveStore;
@@ -204,6 +207,8 @@ public class BusinessChatService {
         runnableConfig.context().put(ChatContextKeys.QUESTION, launchPlan.getQuestion());
 
         runnableConfig.context().put(ChatContextKeys.CHAT_MODE, launchPlan.getChatMode().name());
+        runnableConfig.context().put(ChatContextKeys.TENANT_ID, launchPlan.getTenantId());
+        runnableConfig.context().put(ChatContextKeys.USER_ID, launchPlan.getUserId());
 
         runnableConfig.context().put(ChatContextKeys.CURRENT_DATE, launchPlan.getCurrentDate().toString());
         runnableConfig.context().put(ChatContextKeys.CURRENT_DATE_TEXT, launchPlan.getCurrentDateText());
@@ -220,6 +225,8 @@ public class BusinessChatService {
             exchangeView.getExchangeId(),
             launchPlan.getQuestion(),
             launchPlan.getChatMode(),
+            launchPlan.getTenantId(),
+            launchPlan.getUserId(),
             traceId,
             launchPlan.getSelectedDocumentId(),
             launchPlan.getSelectedDocumentName(),
@@ -301,6 +308,7 @@ public class BusinessChatService {
 
         String conversationId = normalizeConversationId(request.getConversationId());
         ChatQueryMode chatMode = parseRequiredChatMode(request.getChatMode());
+        UserIdentity userIdentity = userIdentityResolver.resolve(request);
 
         KnowledgeDocumentDescriptor selectedDocument = resolveSelectedDocument(chatMode, request.getSelectedDocumentId());
 
@@ -310,6 +318,8 @@ public class BusinessChatService {
             question,
             conversationId,
             chatMode,
+            userIdentity.getTenantId(),
+            userIdentity.getUserId(),
             selectedDocument == null ? null : selectedDocument.getDocumentId(),
             selectedDocument == null ? "" : selectedDocument.getDocumentName(),
             selectedDocument == null ? null : selectedDocument.getLastIndexTaskId(),
@@ -647,6 +657,7 @@ public class BusinessChatService {
             }
             finally {
                 safeRefreshConversationSummary(taskInfo.conversationId());
+                safeExtractUserMemory(taskInfo, answer);
                 cleanup(taskInfo);
             }
         }
@@ -806,6 +817,8 @@ public class BusinessChatService {
 
             .executionMode(executionPlan.getMode() == null ? "" : executionPlan.getMode().name())
             .chatMode(executionPlan.getChatMode())
+            .tenantId(executionPlan.getTenantId())
+            .userId(executionPlan.getUserId())
 
             .originalQuestion(executionPlan.getOriginalQuestion())
             .rewriteQuestion(executionPlan.getRewriteQuestion())
@@ -823,6 +836,9 @@ public class BusinessChatService {
                 : executionPlan.getAnswerHistoryContext().getRenderedText())
             .answerHistoryFollowUpQuestion(executionPlan.getAnswerHistoryContext() != null
                 && executionPlan.getAnswerHistoryContext().isFollowUpQuestion())
+            .userMemoryContext(executionPlan.getUserMemoryContext() == null
+                ? ""
+                : executionPlan.getUserMemoryContext().getMemoryPromptText())
             .historyCompressionApplied(executionPlan.isHistoryCompressionApplied())
             .historyCoveredExchangeId(executionPlan.getHistoryCoveredExchangeId())
             .historyCoveredExchangeCount(executionPlan.getHistoryCoveredExchangeCount())
@@ -1266,6 +1282,13 @@ public class BusinessChatService {
             builder.append(executionPlan.getHistorySummary()).append("\n");
         }
 
+        if (executionPlan.getUserMemoryContext() != null
+            && StrUtil.isNotBlank(executionPlan.getUserMemoryContext().getMemoryPromptText())) {
+            builder.append("\n用户长期画像与跨会话记忆：\n");
+            builder.append(executionPlan.getUserMemoryContext().getMemoryPromptText()).append("\n");
+            builder.append("这些记忆只用于理解用户偏好和任务连续性，不能替代外部事实证据。\n");
+        }
+
         builder.append("\n用户问题：\n");
         builder.append(executionPlan.getOriginalQuestion());
         return builder.toString();
@@ -1333,6 +1356,15 @@ public class BusinessChatService {
         }
         catch (RuntimeException exception) {
             log.warn("刷新会话摘要失败, conversationId={}", conversationId, exception);
+        }
+    }
+
+    private void safeExtractUserMemory(TaskInfo taskInfo, String answer) {
+        try {
+            userMemoryExtractionService.extractAfterCompletion(taskInfo, answer);
+        }
+        catch (RuntimeException exception) {
+            log.warn("触发用户长期记忆抽取失败, conversationId={}, exchangeId={}", taskInfo.conversationId(), taskInfo.exchangeId(), exception);
         }
     }
 

@@ -23,6 +23,8 @@ public class DocumentManageProperties {
 
     private StructureParsing structureParsing = new StructureParsing();
 
+    private VisualParsing visualParsing = new VisualParsing();
+
     private PgVector pgVector = new PgVector();
 
     private Elasticsearch elasticsearch = new Elasticsearch();
@@ -73,6 +75,16 @@ public class DocumentManageProperties {
         private Double ambiguityConfidenceFloor = 0.45D;
 
         private Double ambiguityConfidenceCeil = 0.80D;
+    }
+
+    @Data
+    public static class VisualParsing {
+
+        private Boolean enabled = Boolean.FALSE;
+
+        private Boolean mergeVisualTextIntoParsedText = Boolean.FALSE;
+
+        private Integer maxElements = 80;
     }
 
     @Data
